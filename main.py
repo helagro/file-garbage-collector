@@ -8,19 +8,24 @@ from send2trash import send2trash
 
 THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 defaultRules = None
+exceptions = None
 option = "" if len(sys.argv) < 2 else sys.argv[1]
+
 
 def main():
     global defaultRules
+    global exceptions
+
     print("========== Start ==========")
-    if(option != "del"):
+    if option != "del":
         print("Add argument \"del\" to actually delete files")
 
     settings = getSettings()
+    exceptions = settings["exceptions"]
+
     defaultRules = settings["defaultRules"]
     for folderItem in settings["folders"]:
         deleteOldFiles(folderItem)
-
 
 
 def getSettings():
@@ -35,6 +40,8 @@ def deleteOldFiles(folderItem):
     for itemName in os.listdir(folderItem["path"]):
         itemPath = folderItem["path"] + os.sep + itemName
         itemAge = getItemAge(itemPath)
+        if isItemExcepted(itemPath):
+            continue
         rule = getFirstMatchingRule(folderItem["rules"], itemPath)
 
         if rule is None:
@@ -50,30 +57,38 @@ def getItemAge(path):
     return math.floor(ageInDays)
 
 
+def isItemExcepted(itemPath):
+    for exception in exceptions:
+        if re.match(exception, itemPath):
+            return True
+
+    return False
+
+
 def getFirstMatchingRule(rulesForFolder, itemPath):
     rules = rulesForFolder + defaultRules
     for rule in rules:
         ruleMatches = doesRuleMatch(rule["pattern"], itemPath)
-        if(ruleMatches):
+        if ruleMatches:
             return rule
 
 
 def doesRuleMatch(rulePattern, itemPath):
-    if(rulePattern == "<folder>"):
+    if rulePattern == "<folder>":
         return os.path.isdir(itemPath)
-    if(re.match(rulePattern, itemPath)):
+    if re.match(rulePattern, itemPath):
         return True
     return False
 
 
 def deleteItem(path):
-    if(option == "del"):
+    if option == "del":
         try:
             send2trash(path)
-            print("Deleted: ", path)
+            print("Deleted:", path)
         except OSError:
-            print("Could not delete ", path)
+            print("Could not delete", path)
     else:
-        print("Would have deleted: ", path)
+        print("Would have deleted:", path)
 
 main()
